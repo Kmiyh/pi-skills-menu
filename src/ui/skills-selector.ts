@@ -3,6 +3,7 @@ import { DynamicBorder } from "@mariozechner/pi-coding-agent";
 import {
 	Container,
 	type Component,
+	Editor,
 	type Focusable,
 	Input,
 	Key,
@@ -10,6 +11,7 @@ import {
 	Spacer,
 	Text,
 	truncateToWidth,
+	type TUI,
 } from "@mariozechner/pi-tui";
 import { normalizeSkillName, type SkillCreationAnswers } from "../create-skill.js";
 import { isDeletableSkill } from "../delete-skill.js";
@@ -53,6 +55,27 @@ class SingleLineText implements Component {
 	invalidate(): void {}
 }
 
+class PrefixedEditor implements Component {
+	constructor(
+		private readonly editor: Editor,
+		private readonly prefix = "> ",
+	) {}
+
+	render(width: number): string[] {
+		const editorWidth = Math.max(1, width - this.prefix.length);
+		const rendered = this.editor.render(editorWidth);
+		const lines = rendered.length >= 2 ? rendered.slice(1, -1) : rendered;
+		if (lines.length === 0) {
+			return [this.prefix];
+		}
+		return lines.map((line, index) => `${index === 0 ? this.prefix : "  "}${line}`);
+	}
+
+	invalidate(): void {
+		this.editor.invalidate();
+	}
+}
+
 type BrowseRenderEntry =
 	| { kind: "create" }
 	| { kind: "header"; label: string }
@@ -60,6 +83,7 @@ type BrowseRenderEntry =
 
 class SkillsSelectorComponent extends Container implements Focusable {
 	private input = new Input();
+	private descriptionEditor: Editor;
 	private listContainer = new Container();
 	private footerText = new Text("", 1, 0);
 	private filteredSkills: SkillEntry[] = [];
@@ -81,17 +105,32 @@ class SkillsSelectorComponent extends Container implements Focusable {
 	}
 	set focused(value: boolean) {
 		this._focused = value;
-		this.input.focused = value && (this.mode === "browse" || this.currentCreateStep.kind === "text");
+		this.input.focused = value && (this.mode === "browse" || this.currentCreateStep.id === "name");
+		this.descriptionEditor.focused = value && this.mode === "create" && this.currentCreateStep.id === "description";
 	}
 
 	constructor(
 		private readonly skills: SkillEntry[],
 		private readonly theme: ExtensionContext["ui"]["theme"],
 		private readonly done: (value: SkillsMenuSelection) => void,
+		tui: TUI,
 		initialSelectedIndex = 0,
 		initialQuery = "",
 	) {
 		super();
+		this.descriptionEditor = new Editor(tui, {
+			borderColor: (text: string) => " ".repeat(text.length),
+			selectList: {
+				selectedPrefix: (text: string) => this.theme.fg("accent", text),
+				selectedText: (text: string) => this.theme.bg("selectedBg", this.theme.fg("text", text)),
+				description: (text: string) => this.theme.fg("muted", text),
+				scrollInfo: (text: string) => this.theme.fg("dim", text),
+				noMatch: (text: string) => this.theme.fg("warning", text),
+			},
+		});
+		this.descriptionEditor.onSubmit = () => {
+			this.goToNextCreateStep();
+		};
 		this.filteredSkills = skills;
 		this.selectedIndex = Math.max(0, initialSelectedIndex);
 		this.browseQuery = initialQuery;
@@ -187,17 +226,24 @@ class SkillsSelectorComponent extends Container implements Focusable {
 
 	private syncCreateInput(): void {
 		const step = this.currentCreateStep;
-		if (step.kind === "text") {
-			this.input.setValue(this.createValues[step.id]);
+		if (step.id === "name") {
+			this.input.setValue(this.createValues.name);
 			this.input.focused = this._focused;
+			this.descriptionEditor.focused = false;
+			return;
 		}
+		this.descriptionEditor.setText(this.createValues.description);
+		this.input.focused = false;
+		this.descriptionEditor.focused = this._focused;
 	}
 
 	private persistCreateInput(): void {
 		const step = this.currentCreateStep;
-		if (step.kind === "text") {
-			this.createValues[step.id] = this.input.getValue();
+		if (step.id === "name") {
+			this.createValues.name = this.input.getValue();
+			return;
 		}
+		this.createValues.description = this.descriptionEditor.getText();
 	}
 
 	private validateCreateStep(): boolean {
@@ -339,13 +385,16 @@ class SkillsSelectorComponent extends Container implements Focusable {
 
 	private refreshCreate(): void {
 		const step = this.currentCreateStep;
-		this.rebuildLayout(step.kind === "text");
+		this.rebuildLayout(step.id === "name");
 		this.header.setText(this.theme.fg("accent", this.theme.bold(`${step.title} (${step.optional ? "optional" : "required"})`)));
 		this.footerText.setText(this.theme.fg("dim", this.getCreateFooter(step)));
 		this.renderCreateList();
 	}
 
-	private getCreateFooter(_step: CreateStep): string {
+	private getCreateFooter(step: CreateStep): string {
+		if (step.id === "description") {
+			return "enter create • ctrl+j newline • alt+← back • esc cancel";
+		}
 		return this.createStepIndex >= CREATE_STEPS.length - 1
 			? "enter create • alt+← back • esc cancel"
 			: "enter next • alt+← back • alt+→ next • esc cancel";
@@ -354,7 +403,16 @@ class SkillsSelectorComponent extends Container implements Focusable {
 	private renderCreateList(): void {
 		this.listContainer.clear();
 		const step = this.currentCreateStep;
-		this.listContainer.addChild(new Text(this.theme.fg("dim", step.hint), 1, 0));
+
+		if (step.id === "description") {
+			this.listContainer.addChild(new PrefixedEditor(this.descriptionEditor));
+			if (step.hint) {
+				this.listContainer.addChild(new Spacer(1));
+				this.listContainer.addChild(new Text(this.theme.fg("dim", step.hint), 1, 0));
+			}
+		} else if (step.hint) {
+			this.listContainer.addChild(new Text(this.theme.fg("dim", step.hint), 1, 0));
+		}
 
 		if (this.createError) {
 			this.listContainer.addChild(new Spacer(1));
@@ -435,15 +493,25 @@ class SkillsSelectorComponent extends Container implements Focusable {
 			this.goToPreviousCreateStep();
 			return;
 		}
-		if (matchesKey(data, Key.alt("right")) || matchesKey(data, Key.enter)) {
+		if (matchesKey(data, Key.alt("right"))) {
+			this.goToNextCreateStep();
+			return;
+		}
+		if (matchesKey(data, Key.enter) && this.currentCreateStep.id === "name") {
 			this.goToNextCreateStep();
 			return;
 		}
 
 		this.createError = undefined;
 		const step = this.currentCreateStep;
-		this.input.handleInput(data);
-		this.createValues[step.id] = this.input.getValue();
+		if (step.id === "name") {
+			this.input.handleInput(data);
+			this.createValues.name = this.input.getValue();
+			this.refreshCreate();
+			return;
+		}
+		this.descriptionEditor.handleInput(data);
+		this.createValues.description = this.descriptionEditor.getText();
 		this.refreshCreate();
 	}
 }
@@ -459,6 +527,7 @@ export async function showSkillsSelector(
 			registry.skills,
 			ctx.ui.theme,
 			done,
+			tui,
 			initialSelectedIndex,
 			initialQuery,
 		);

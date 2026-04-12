@@ -168,6 +168,11 @@ npm run typecheck
 ```
 
 5. test locally
+
+```bash
+pi -e ./src/index.ts
+```
+
 6. open a pull request
 
 ## License
