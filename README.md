@@ -18,6 +18,14 @@ When the extension is installed, it automatically writes the following to `setti
 
 This disables the default `/skill:<name>` command registration in the main menu and moves skill usage into one dedicated menu.
 
+## Installation
+
+It can be installed with:
+
+```bash
+pi install npm:@kmiyh/pi-skills-menu
+```
+
 ## What the `/skills` menu contains
 
 The menu shows **all installed available skills**:
@@ -174,20 +182,6 @@ pi -e ./src/index.ts
 ```
 
 6. open a pull request
-
-## npm package
-
-This package is intended to be published as:
-
-```bash
-@kmiyh/pi-skills-menu
-```
-
-After publication, it can be installed with:
-
-```bash
-pi install npm:@kmiyh/pi-skills-menu
-```
 
 ## License
 
