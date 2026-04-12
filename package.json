@@ -1,9 +1,20 @@
 {
-  "name": "skills-menu",
+  "name": "@kmiyh/pi-skills-menu",
   "version": "0.1.0",
-  "description": "Pi extension that adds a skills browser, preview, rename, delete, and skill insertion workflow.",
+  "description": "Pi extension that moves skills into a dedicated /skills menu with browsing, preview, editing, and AI-assisted creation.",
   "type": "module",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package",
+    "pi-agent",
+    "pi-extension",
+    "skills",
+    "menu"
+  ],
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
@@ -21,5 +32,14 @@
   },
   "pi": {
     "extensions": ["./src/index.ts"]
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kmiyh/pi-skills-menu.git"
+  },
+  "homepage": "https://github.com/Kmiyh/pi-skills-menu#readme",
+  "bugs": {
+    "url": "https://github.com/Kmiyh/pi-skills-menu/issues"
+  },
+  "license": "MIT"
 }

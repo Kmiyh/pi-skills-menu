@@ -1,6 +1,6 @@
-# skills-menu
+# @kmiyh/pi-skills-menu
 
-`skills-menu` is a Pi Agent extension that moves all skills out of Pi's main menu into a separate menu opened with:
+`@kmiyh/pi-skills-menu` is a Pi Agent extension that moves all skills out of Pi's main menu into a separate menu opened with:
 
 ```bash
 /skills
@@ -174,6 +174,20 @@ pi -e ./src/index.ts
 ```
 
 6. open a pull request
+
+## npm package
+
+This package is intended to be published as:
+
+```bash
+@kmiyh/pi-skills-menu
+```
+
+After publication, it can be installed with:
+
+```bash
+pi install npm:@kmiyh/pi-skills-menu
+```
 
 ## License
 
