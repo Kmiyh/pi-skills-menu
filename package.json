@@ -41,5 +41,8 @@
   "bugs": {
     "url": "https://github.com/Kmiyh/pi-skills-menu/issues"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
 }
