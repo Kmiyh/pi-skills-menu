@@ -1,6 +1,6 @@
 {
   "name": "@kmiyh/pi-skills-menu",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Pi extension that moves skills into a dedicated /skills menu with browsing, preview, editing, and AI-assisted creation.",
   "type": "module",
   "keywords": [
