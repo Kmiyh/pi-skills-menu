@@ -1,0 +1,25 @@
+{
+  "name": "skills-menu",
+  "version": "0.1.0",
+  "description": "Pi extension that adds a skills browser, preview, rename, delete, and skill insertion workflow.",
+  "type": "module",
+  "keywords": ["pi-package"],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "@types/node": "^24.5.2",
+    "typescript": "^5.9.2"
+  },
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  }
+}
