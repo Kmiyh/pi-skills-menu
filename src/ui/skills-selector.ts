@@ -96,6 +96,7 @@ class SkillsSelectorComponent extends Container implements Focusable {
 		name: "",
 		description: "",
 	};
+	private submittedDescriptionValue: string | undefined;
 	private createError: string | undefined;
 	private browseQuery: string;
 
@@ -128,7 +129,8 @@ class SkillsSelectorComponent extends Container implements Focusable {
 				noMatch: (text: string) => this.theme.fg("warning", text),
 			},
 		});
-		this.descriptionEditor.onSubmit = () => {
+		this.descriptionEditor.onSubmit = (text: string) => {
+			this.submittedDescriptionValue = text;
 			this.goToNextCreateStep();
 		};
 		this.filteredSkills = skills;
@@ -232,6 +234,7 @@ class SkillsSelectorComponent extends Container implements Focusable {
 			this.descriptionEditor.focused = false;
 			return;
 		}
+		this.submittedDescriptionValue = undefined;
 		this.descriptionEditor.setText(this.createValues.description);
 		this.input.focused = false;
 		this.descriptionEditor.focused = this._focused;
@@ -241,6 +244,11 @@ class SkillsSelectorComponent extends Container implements Focusable {
 		const step = this.currentCreateStep;
 		if (step.id === "name") {
 			this.createValues.name = this.input.getValue();
+			return;
+		}
+		if (this.submittedDescriptionValue !== undefined) {
+			this.createValues.description = this.submittedDescriptionValue;
+			this.submittedDescriptionValue = undefined;
 			return;
 		}
 		this.createValues.description = this.descriptionEditor.getText();
@@ -276,7 +284,6 @@ class SkillsSelectorComponent extends Container implements Focusable {
 	}
 
 	private submitCreate(): void {
-		this.persistCreateInput();
 		const name = normalizeSkillName(this.createValues.name);
 		if (!name) {
 			this.createStepIndex = 0;
@@ -511,6 +518,9 @@ class SkillsSelectorComponent extends Container implements Focusable {
 			return;
 		}
 		this.descriptionEditor.handleInput(data);
+		if (matchesKey(data, Key.enter)) {
+			return;
+		}
 		this.createValues.description = this.descriptionEditor.getText();
 		this.refreshCreate();
 	}
