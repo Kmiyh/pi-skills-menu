@@ -13,7 +13,7 @@ import {
 	truncateToWidth,
 	type TUI,
 } from "@mariozechner/pi-tui";
-import { normalizeSkillName, type SkillCreationAnswers } from "../create-skill.js";
+import { normalizeSkillName, type SkillCreationAnswers, type SkillLocation } from "../create-skill.js";
 import { isDeletableSkill } from "../delete-skill.js";
 import type { SkillEntry, SkillRegistry } from "../types.js";
 
@@ -25,11 +25,22 @@ export type SkillsMenuSelection =
 	| null;
 
 type CreateTextStepId = "name" | "description";
-type CreateStep = { id: CreateTextStepId; title: string; hint: string; optional: boolean; kind: "text" };
+type CreateChoiceStepId = "location";
+type CreateStepId = CreateTextStepId | CreateChoiceStepId;
+type CreateTextStep = { id: CreateTextStepId; title: string; hint: string; optional: boolean; kind: "text" };
+type CreateChoiceOption = { value: SkillLocation; label: string; description: string };
+type CreateChoiceStep = { id: CreateChoiceStepId; title: string; hint: string; optional: boolean; kind: "choice"; options: CreateChoiceOption[] };
+type CreateStep = CreateTextStep | CreateChoiceStep;
+
+const LOCATION_OPTIONS: CreateChoiceOption[] = [
+	{ value: "global", label: "Global", description: "Save in your user-level Pi skills directory." },
+	{ value: "project", label: "Project", description: "Save in this project's .pi/skills directory." },
+];
 
 const CREATE_STEPS: CreateStep[] = [
 	{ id: "name", title: "Name", hint: "Use lowercase letters, numbers, and hyphens, for example react-review.", optional: false, kind: "text" },
 	{ id: "description", title: "Description", hint: "Describe what the skill does and when it should be used in one clear sentence.", optional: false, kind: "text" },
+	{ id: "location", title: "Visibility", hint: "Choose whether the skill is available only in this project or in all your Pi sessions.", optional: false, kind: "choice", options: LOCATION_OPTIONS },
 ];
 
 function getScopeLabel(skill: SkillEntry): string {
@@ -96,6 +107,7 @@ class SkillsSelectorComponent extends Container implements Focusable {
 		name: "",
 		description: "",
 	};
+	private createLocation: SkillLocation = "global";
 	private submittedDescriptionValue: string | undefined;
 	private createError: string | undefined;
 	private browseQuery: string;
@@ -206,6 +218,13 @@ class SkillsSelectorComponent extends Container implements Focusable {
 		return CREATE_STEPS[this.createStepIndex]!;
 	}
 
+	private moveLocationSelection(delta: number): void {
+		const currentIndex = LOCATION_OPTIONS.findIndex((option) => option.value === this.createLocation);
+		const safeIndex = currentIndex === -1 ? 0 : currentIndex;
+		const nextIndex = (safeIndex + delta + LOCATION_OPTIONS.length) % LOCATION_OPTIONS.length;
+		this.createLocation = LOCATION_OPTIONS[nextIndex]!.value;
+	}
+
 	private setBrowseInputValue(value: string): void {
 		this.browseQuery = value;
 		this.input.setValue(value);
@@ -234,10 +253,15 @@ class SkillsSelectorComponent extends Container implements Focusable {
 			this.descriptionEditor.focused = false;
 			return;
 		}
-		this.submittedDescriptionValue = undefined;
-		this.descriptionEditor.setText(this.createValues.description);
+		if (step.id === "description") {
+			this.submittedDescriptionValue = undefined;
+			this.descriptionEditor.setText(this.createValues.description);
+			this.input.focused = false;
+			this.descriptionEditor.focused = this._focused;
+			return;
+		}
 		this.input.focused = false;
-		this.descriptionEditor.focused = this._focused;
+		this.descriptionEditor.focused = false;
 	}
 
 	private persistCreateInput(): void {
@@ -246,12 +270,14 @@ class SkillsSelectorComponent extends Container implements Focusable {
 			this.createValues.name = this.input.getValue();
 			return;
 		}
-		if (this.submittedDescriptionValue !== undefined) {
-			this.createValues.description = this.submittedDescriptionValue;
-			this.submittedDescriptionValue = undefined;
-			return;
+		if (step.id === "description") {
+			if (this.submittedDescriptionValue !== undefined) {
+				this.createValues.description = this.submittedDescriptionValue;
+				this.submittedDescriptionValue = undefined;
+				return;
+			}
+			this.createValues.description = this.descriptionEditor.getText();
 		}
-		this.createValues.description = this.descriptionEditor.getText();
 	}
 
 	private validateCreateStep(): boolean {
@@ -269,6 +295,11 @@ class SkillsSelectorComponent extends Container implements Focusable {
 				this.refresh();
 				return false;
 			}
+		}
+		if (step.kind === "choice" && !LOCATION_OPTIONS.some((option) => option.value === this.createLocation)) {
+			this.createError = `${step.title} is required.`;
+			this.refresh();
+			return false;
 		}
 		this.createError = undefined;
 		return true;
@@ -306,7 +337,7 @@ class SkillsSelectorComponent extends Container implements Focusable {
 				name,
 				description: this.createValues.description.trim(),
 				allowedTools: [],
-				location: "project",
+				location: this.createLocation,
 			},
 			selectedIndex: this.selectedIndex,
 			query: this.browseQuery,
@@ -400,7 +431,10 @@ class SkillsSelectorComponent extends Container implements Focusable {
 
 	private getCreateFooter(step: CreateStep): string {
 		if (step.id === "description") {
-			return "enter create • ctrl+j newline • alt+← back • esc cancel";
+			return "enter next • ctrl+j newline • alt+← back • alt+→ next • esc cancel";
+		}
+		if (step.id === "location") {
+			return "↑↓ choose • enter create • alt+← back • esc cancel";
 		}
 		return this.createStepIndex >= CREATE_STEPS.length - 1
 			? "enter create • alt+← back • esc cancel"
@@ -413,6 +447,18 @@ class SkillsSelectorComponent extends Container implements Focusable {
 
 		if (step.id === "description") {
 			this.listContainer.addChild(new PrefixedEditor(this.descriptionEditor));
+			if (step.hint) {
+				this.listContainer.addChild(new Spacer(1));
+				this.listContainer.addChild(new Text(this.theme.fg("dim", step.hint), 1, 0));
+			}
+		} else if (step.id === "location") {
+			for (const option of step.options) {
+				const isSelected = option.value === this.createLocation;
+				const prefix = isSelected ? this.theme.fg("accent", "→ ") : "  ";
+				const label = isSelected ? this.theme.fg("accent", option.label) : option.label;
+				const description = this.theme.fg("dim", ` — ${option.description}`);
+				this.listContainer.addChild(new SingleLineText(`${prefix}${label}${description}`));
+			}
 			if (step.hint) {
 				this.listContainer.addChild(new Spacer(1));
 				this.listContainer.addChild(new Text(this.theme.fg("dim", step.hint), 1, 0));
@@ -504,7 +550,7 @@ class SkillsSelectorComponent extends Container implements Focusable {
 			this.goToNextCreateStep();
 			return;
 		}
-		if (matchesKey(data, Key.enter) && this.currentCreateStep.id === "name") {
+		if (matchesKey(data, Key.enter) && this.currentCreateStep.id !== "description") {
 			this.goToNextCreateStep();
 			return;
 		}
@@ -515,6 +561,19 @@ class SkillsSelectorComponent extends Container implements Focusable {
 			this.input.handleInput(data);
 			this.createValues.name = this.input.getValue();
 			this.refreshCreate();
+			return;
+		}
+		if (step.id === "location") {
+			if (matchesKey(data, Key.up)) {
+				this.moveLocationSelection(-1);
+				this.refreshCreate();
+				return;
+			}
+			if (matchesKey(data, Key.down)) {
+				this.moveLocationSelection(1);
+				this.refreshCreate();
+				return;
+			}
 			return;
 		}
 		this.descriptionEditor.handleInput(data);
