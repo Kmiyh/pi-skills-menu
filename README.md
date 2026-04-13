@@ -67,7 +67,7 @@ After that, the skill is inserted into the editor so it will be used by Pi when 
 
 The list also contains a dedicated entry for creating a new skill.
 
-Skill creation is done by entering:
+Skill creation is done in three steps:
 
 1. **skill name**
 
@@ -76,6 +76,10 @@ Skill creation is done by entering:
 2. **skill description**
 
 ![skill-create-description.jpg](src/images/skill-create-description.jpg)
+
+3. **skill visibility**
+   - **Global** — save the skill in your user-level Pi skills directory
+   - **Project** — save the skill in the current project's `.pi/skills` directory
 
 After that, the extension generates a `SKILL.md`.
 
