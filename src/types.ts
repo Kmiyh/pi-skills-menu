@@ -10,9 +10,11 @@ export interface SkillEntry {
 	origin: "package" | "top-level";
 	source: string;
 	baseDir?: string;
+	enabled: boolean;
 }
 
 export interface SkillRegistry {
 	skills: SkillEntry[];
+	allSkills: SkillEntry[];
 	byName: Map<string, SkillEntry>;
 }

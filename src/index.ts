@@ -5,12 +5,14 @@ import { detectExtensionInstallScope } from "./extension-scope.js";
 import { expandSkillMarkers, hasSkillMarker, insertSkillMarker, removeIncompleteSkillMarkerLines } from "./markers.js";
 import { loadSkillRegistry } from "./skill-registry.js";
 import { ensureSkillCommandsHidden } from "./settings-toggle.js";
+import { setSkillEnabled } from "./skill-enabled-toggle.js";
 import type { ExtensionInstallScope, SkillRegistry } from "./types.js";
 import { showSkillPreview } from "./ui/skill-preview.js";
 import { showSkillsSelector } from "./ui/skills-selector.js";
 
 const EMPTY_REGISTRY: SkillRegistry = {
 	skills: [],
+	allSkills: [],
 	byName: new Map(),
 };
 
@@ -131,9 +133,26 @@ export default function skillsMenuExtension(pi: ExtensionAPI) {
 						continue;
 					}
 					await refreshRegistry(ctx.cwd);
-					const createdSkillIndex = registry.skills.findIndex((skill) => skill.path === createdSkill.path);
+					const createdSkillIndex = registry.allSkills.findIndex((skill) => skill.path === createdSkill.path);
 					selectorIndex = createdSkillIndex >= 0 ? createdSkillIndex + 1 : 0;
 					selectorQuery = "";
+					continue;
+				}
+
+				if (selection.type === "toggle") {
+					try {
+						await setSkillEnabled(ctx.cwd, selection.skill, !selection.skill.enabled);
+						await refreshRegistry(ctx.cwd);
+						ctx.ui.notify(
+							selection.skill.enabled
+								? `Disabled ${selection.skill.name}. Run /reload to fully apply the change.`
+								: `Enabled ${selection.skill.name}. Run /reload to fully apply the change.`,
+							"info",
+						);
+					} catch (error) {
+						console.error("skills-menu: failed to toggle skill", error);
+						ctx.ui.notify(error instanceof Error ? error.message : "Failed to update skill visibility", "error");
+					}
 					continue;
 				}
 

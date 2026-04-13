@@ -59,9 +59,21 @@ Press:
 
 Press:
 
-- `Enter` — select a skill and insert it into the editor
+- `Enter` — select an enabled skill and insert it into the editor
 
 After that, the skill is inserted into the editor so it will be used by Pi when the message is sent.
+
+### Enable or disable a skill
+
+Press:
+
+- `x` — toggle the selected skill between enabled and disabled
+
+This also works for skills that come from installed libraries/packages.
+
+Disabled skills stay visible in the list and are marked with:
+
+- `[disabled]`
 
 ### Create a new skill
 

@@ -1014,6 +1014,7 @@ export async function createSkillFromAnswers(
 		origin: "top-level",
 		source: "auto",
 		baseDir: targetDir,
+		enabled: true,
 	};
 }
 

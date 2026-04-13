@@ -22,6 +22,7 @@ export type SkillsMenuSelection =
 	| { type: "create"; answers: SkillCreationAnswers; selectedIndex: number; query: string }
 	| { type: "preview"; skill: SkillEntry; selectedIndex: number; query: string }
 	| { type: "delete"; skill: SkillEntry; selectedIndex: number; query: string }
+	| { type: "toggle"; skill: SkillEntry; selectedIndex: number; query: string }
 	| null;
 
 type CreateTextStepId = "name" | "description";
@@ -179,8 +180,8 @@ class SkillsSelectorComponent extends Container implements Focusable {
 	}
 
 	private orderBrowseSkills(skills: SkillEntry[]): SkillEntry[] {
-		const ownSkills = skills.filter((skill) => isDeletableSkill(skill));
-		const otherSkills = skills.filter((skill) => !isDeletableSkill(skill));
+		const ownSkills = skills.filter((skill) => isDeletableSkill(skill)).sort((a, b) => Number(b.enabled) - Number(a.enabled));
+		const otherSkills = skills.filter((skill) => !isDeletableSkill(skill)).sort((a, b) => Number(b.enabled) - Number(a.enabled));
 		return [...ownSkills, ...otherSkills];
 	}
 
@@ -361,10 +362,20 @@ class SkillsSelectorComponent extends Container implements Focusable {
 		this.filteredSkills = this.orderBrowseSkills(this.filterSkills(this.browseQuery));
 		this.selectedIndex = Math.min(this.selectedIndex, Math.max(0, this.getSelectableCount() - 1));
 		const selectedSkill = this.getSelectedSkill();
-		const footer = !this.browseQuery && selectedSkill && isDeletableSkill(selectedSkill)
-			? "type to search • enter insert • tab preview • backspace delete • esc close"
-			: "type to search • enter insert • tab preview • esc close";
-		this.footerText.setText(this.theme.fg("dim", footer));
+		const actions = ["type to search"];
+		if (!selectedSkill) {
+			actions.push("enter create", "esc close");
+		} else {
+			if (selectedSkill.enabled) {
+				actions.push("enter insert");
+			}
+			actions.push("tab preview", "x enable/disable");
+			if (!this.browseQuery && isDeletableSkill(selectedSkill)) {
+				actions.push("backspace delete");
+			}
+			actions.push("esc close");
+		}
+		this.footerText.setText(this.theme.fg("dim", actions.join(" • ")));
 		this.renderBrowseList();
 	}
 
@@ -406,13 +417,14 @@ class SkillsSelectorComponent extends Container implements Focusable {
 				} else {
 					const skill = entry.skill;
 					const prefix = isSelected ? this.theme.fg("accent", "→ ") : "  ";
-					const name = isSelected ? this.theme.fg("accent", skill.name) : skill.name;
+					const name = isSelected ? this.theme.fg("accent", skill.name) : skill.enabled ? skill.name : this.theme.fg("muted", skill.name);
+					const status = skill.enabled ? "" : this.theme.fg("warning", " [disabled]");
 					const scope = this.theme.fg("muted", ` [${getScopeLabel(skill)}]`);
 					const packageLabel = getPackageLabel(skill);
 					const source = packageLabel ? this.theme.fg("muted", ` - [${packageLabel}]`) : "";
 					const descriptionPrefix = packageLabel ? " " : " - ";
 					const description = this.theme.fg("dim", `${descriptionPrefix}${skill.description}`);
-					this.listContainer.addChild(new SingleLineText(`${prefix}${name}${scope}${source}${description}`, descriptionEllipsis));
+					this.listContainer.addChild(new SingleLineText(`${prefix}${name}${status}${scope}${source}${description}`, descriptionEllipsis));
 				}
 			}
 			if (isSelectable) {
@@ -503,7 +515,7 @@ class SkillsSelectorComponent extends Container implements Focusable {
 				return;
 			}
 			const skill = this.getSelectedSkill();
-			if (skill) {
+			if (skill?.enabled) {
 				this.done({ type: "skill", skill, selectedIndex: this.selectedIndex, query: this.browseQuery });
 			}
 			return;
@@ -512,6 +524,13 @@ class SkillsSelectorComponent extends Container implements Focusable {
 			const skill = this.getSelectedSkill();
 			if (skill) {
 				this.done({ type: "preview", skill, selectedIndex: this.selectedIndex, query: this.browseQuery });
+			}
+			return;
+		}
+		if (data === "x" || data === "X") {
+			const skill = this.getSelectedSkill();
+			if (skill) {
+				this.done({ type: "toggle", skill, selectedIndex: this.selectedIndex, query: this.browseQuery });
 			}
 			return;
 		}
@@ -593,7 +612,7 @@ export async function showSkillsSelector(
 ): Promise<SkillsMenuSelection> {
 	return await ctx.ui.custom<SkillsMenuSelection>((tui, _theme, _kb, done) => {
 		const component = new SkillsSelectorComponent(
-			registry.skills,
+			registry.allSkills,
 			ctx.ui.theme,
 			done,
 			tui,
