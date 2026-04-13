@@ -67,7 +67,7 @@ After that, the skill is inserted into the editor so it will be used by Pi when 
 
 Press:
 
-- `x` — toggle the selected skill between enabled and disabled
+- `Ctrl+X` — toggle the selected skill between enabled and disabled
 
 This also works for skills that come from installed libraries/packages.
 

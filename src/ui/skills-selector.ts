@@ -180,8 +180,8 @@ class SkillsSelectorComponent extends Container implements Focusable {
 	}
 
 	private orderBrowseSkills(skills: SkillEntry[]): SkillEntry[] {
-		const ownSkills = skills.filter((skill) => isDeletableSkill(skill)).sort((a, b) => Number(b.enabled) - Number(a.enabled));
-		const otherSkills = skills.filter((skill) => !isDeletableSkill(skill)).sort((a, b) => Number(b.enabled) - Number(a.enabled));
+		const ownSkills = skills.filter((skill) => isDeletableSkill(skill));
+		const otherSkills = skills.filter((skill) => !isDeletableSkill(skill));
 		return [...ownSkills, ...otherSkills];
 	}
 
@@ -369,7 +369,7 @@ class SkillsSelectorComponent extends Container implements Focusable {
 			if (selectedSkill.enabled) {
 				actions.push("enter insert");
 			}
-			actions.push("tab preview", "x enable/disable");
+			actions.push("tab preview", "ctrl+x enable/disable");
 			if (!this.browseQuery && isDeletableSkill(selectedSkill)) {
 				actions.push("backspace delete");
 			}
@@ -527,7 +527,7 @@ class SkillsSelectorComponent extends Container implements Focusable {
 			}
 			return;
 		}
-		if (data === "x" || data === "X") {
+		if (matchesKey(data, Key.ctrl("x"))) {
 			const skill = this.getSelectedSkill();
 			if (skill) {
 				this.done({ type: "toggle", skill, selectedIndex: this.selectedIndex, query: this.browseQuery });

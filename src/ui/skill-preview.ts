@@ -37,7 +37,7 @@ function getSkillLocation(skill: SkillEntry): string {
 }
 
 function getSkillLocationLabel(skill: SkillEntry): string {
-	return skill.origin === "package" ? "package" : "path";
+	return skill.origin === "package" ? "package • " : "";
 }
 
 function formatScalar(value: unknown): string {
@@ -271,7 +271,7 @@ class ScrollableSkillPreview implements Component {
 	private buildContentLines(innerWidth: number): string[] {
 		const content = new Container();
 		content.addChild(new Text(this.theme.fg("accent", this.theme.bold(this.skill.name)), 0, 0));
-		content.addChild(new Text(this.theme.fg("muted", `${getSkillLocationLabel(this.skill)} • ${getSkillLocation(this.skill)}`), 0, 0));
+		content.addChild(new Text(this.theme.fg("muted", `${getSkillLocationLabel(this.skill)}${getSkillLocation(this.skill)}`), 0, 0));
 		content.addChild(new Spacer(1));
 		content.addChild(new Text(this.theme.fg("muted", this.theme.bold("Metadata")), 0, 0));
 		content.addChild(new Text(this.theme.fg("dim", buildFrontmatterBlock(this.skill)), 0, 0));
@@ -292,7 +292,7 @@ class ScrollableSkillPreview implements Component {
 			: "";
 		const editInfo = this.editable ? " • e edit • r rename" : "";
 		return truncateToWidth(
-			this.theme.fg("dim", `↑/↓ scroll • pgup/pgdn jump • home/end${editInfo} • esc back${scrollInfo}`),
+			this.theme.fg("dim", `↑/↓ scroll${editInfo} • esc back${scrollInfo}`),
 			innerWidth,
 			this.theme.fg("dim", "..."),
 		);

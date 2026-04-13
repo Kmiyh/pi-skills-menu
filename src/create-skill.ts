@@ -546,6 +546,7 @@ export type SkillCreationThinkingLevel = ThinkingLevel | "off";
 
 export interface SkillGenerationOptions {
 	thinkingLevel?: SkillCreationThinkingLevel;
+	signal?: AbortSignal;
 }
 
 class SingleLineText implements Component {
@@ -863,11 +864,21 @@ function getGenerationStatusLabel(
 		: `Generating skill draft using ${modelLabel}...`;
 }
 
+function isAbortError(error: unknown): boolean {
+	if (!error || typeof error !== "object") return false;
+	const name = "name" in error ? String((error as { name?: unknown }).name) : "";
+	const message = "message" in error ? String((error as { message?: unknown }).message) : "";
+	return name === "AbortError" || message.toLowerCase().includes("aborted");
+}
+
 async function generateSkillDraft(
 	ctx: ExtensionContext,
 	answers: SkillCreationAnswers,
 	options?: SkillGenerationOptions,
 ): Promise<string> {
+	if (options?.signal?.aborted) {
+		throw new Error("Generation aborted");
+	}
 	if (!ctx.model) {
 		return buildFallbackSkill(answers);
 	}
@@ -910,8 +921,12 @@ async function generateSkillDraft(
 	const response = await completeSimple(
 		ctx.model,
 		{ systemPrompt: GENERATE_SKILL_SYSTEM_PROMPT, messages: [userMessage] },
-		{ apiKey: auth.apiKey, headers: auth.headers, ...(reasoning ? { reasoning } : {}) },
+		{ apiKey: auth.apiKey, headers: auth.headers, ...(reasoning ? { reasoning } : {}), ...(options?.signal ? { signal: options.signal } : {}) },
 	);
+
+	if (options?.signal?.aborted) {
+		throw new Error("Generation aborted");
+	}
 
 	const generated = response.content
 		.filter((c): c is { type: "text"; text: string } => c.type === "text")
@@ -942,10 +957,43 @@ async function runDraftGeneration(
 
 		generateSkillDraft(ctx, answers, options)
 			.then(done)
-			.catch(() => done(buildFallbackSkill(answers)));
+			.catch((error) => done(isAbortError(error) ? null : buildFallbackSkill(answers)));
 
 		return loader;
 	});
+}
+
+async function saveCreatedSkill(
+	ctx: ExtensionContext,
+	answers: SkillCreationAnswers,
+	draft: string,
+): Promise<SkillEntry | null> {
+	let parsedSkill: ParsedSkillDraft;
+	try {
+		parsedSkill = parseSkillDraft(draft, answers.name);
+	} catch (error) {
+		ctx.ui.notify(error instanceof Error ? error.message : "Invalid generated SKILL.md", "error");
+		return null;
+	}
+
+	const targetDir = getTargetDir(ctx, answers.location, answers.name);
+	const targetPath = join(targetDir, "SKILL.md");
+	await mkdir(targetDir, { recursive: true });
+	await writeFile(targetPath, parsedSkill.raw, "utf8");
+
+	ctx.ui.notify(`Created skill: ${targetPath}`, "info");
+	return {
+		name: parsedSkill.name,
+		description: parsedSkill.description,
+		path: targetPath,
+		content: parsedSkill.content,
+		frontmatter: parsedSkill.frontmatter,
+		scope: answers.location === "global" ? "user" : "project",
+		origin: "top-level",
+		source: "auto",
+		baseDir: targetDir,
+		enabled: true,
+	};
 }
 
 async function collectAnswers(ctx: ExtensionContext): Promise<SkillCreationAnswers | null> {
@@ -992,30 +1040,36 @@ export async function createSkillFromAnswers(
 		return null;
 	}
 
-	let parsedSkill: ParsedSkillDraft;
-	try {
-		parsedSkill = parseSkillDraft(draft, answers.name);
-	} catch (error) {
-		ctx.ui.notify(error instanceof Error ? error.message : "Invalid generated SKILL.md", "error");
+	return await saveCreatedSkill(ctx, answers, draft);
+}
+
+export async function createSkillFromAnswersWithoutUI(
+	ctx: ExtensionContext,
+	answers: SkillCreationAnswers,
+	options?: SkillGenerationOptions,
+): Promise<SkillEntry | null> {
+	const targetDir = getTargetDir(ctx, answers.location, answers.name);
+	const targetPath = join(targetDir, "SKILL.md");
+	if (existsSync(targetPath)) {
+		ctx.ui.notify(`Skill already exists: ${targetPath}`, "error");
 		return null;
 	}
 
-	await mkdir(targetDir, { recursive: true });
-	await writeFile(targetPath, parsedSkill.raw, "utf8");
+	let draft: string;
+	try {
+		draft = await generateSkillDraft(ctx, answers, options);
+	} catch (error) {
+		if (isAbortError(error) || options?.signal?.aborted) {
+			return null;
+		}
+		draft = buildFallbackSkill(answers);
+	}
 
-	ctx.ui.notify(`Created skill: ${targetPath}`, "info");
-	return {
-		name: parsedSkill.name,
-		description: parsedSkill.description,
-		path: targetPath,
-		content: parsedSkill.content,
-		frontmatter: parsedSkill.frontmatter,
-		scope: answers.location === "global" ? "user" : "project",
-		origin: "top-level",
-		source: "auto",
-		baseDir: targetDir,
-		enabled: true,
-	};
+	if (options?.signal?.aborted) {
+		return null;
+	}
+
+	return await saveCreatedSkill(ctx, answers, draft);
 }
 
 export async function createNewSkill(

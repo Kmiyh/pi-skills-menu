@@ -3,10 +3,6 @@ import { parseSkillFile } from "./skill-parser.js";
 import type { SkillEntry, SkillRegistry } from "./types.js";
 
 function compareSkills(a: SkillEntry, b: SkillEntry): number {
-	if (a.enabled !== b.enabled) {
-		return a.enabled ? -1 : 1;
-	}
-
 	const scopeRank = (scope: SkillEntry["scope"]) => {
 		switch (scope) {
 			case "project":

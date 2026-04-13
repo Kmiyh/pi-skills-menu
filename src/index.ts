@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext, InputEventResult } from "@mariozechner/pi-coding-agent";
-import { createSkillFromAnswers } from "./create-skill.js";
+import { createSkillFromAnswersWithoutUI } from "./create-skill.js";
 import { deleteSkill } from "./delete-skill.js";
 import { detectExtensionInstallScope } from "./extension-scope.js";
 import { expandSkillMarkers, hasSkillMarker, insertSkillMarker, removeIncompleteSkillMarkerLines } from "./markers.js";
@@ -7,8 +7,7 @@ import { loadSkillRegistry } from "./skill-registry.js";
 import { ensureSkillCommandsHidden } from "./settings-toggle.js";
 import { setSkillEnabled } from "./skill-enabled-toggle.js";
 import type { ExtensionInstallScope, SkillRegistry } from "./types.js";
-import { showSkillPreview } from "./ui/skill-preview.js";
-import { showSkillsSelector } from "./ui/skills-selector.js";
+import { showSkillsManager } from "./ui/skills-manager.js";
 
 const EMPTY_REGISTRY: SkillRegistry = {
 	skills: [],
@@ -107,81 +106,42 @@ export default function skillsMenuExtension(pi: ExtensionAPI) {
 				return;
 			}
 
-			let selectorIndex = 0;
-			let selectorQuery = "";
-			while (true) {
-				try {
-					await refreshRegistry(ctx.cwd);
-				} catch (error) {
-					console.error("skills-menu: failed to refresh skills registry", error);
-					ctx.ui.notify("Failed to load skills list", "error");
-					return;
-				}
+			try {
+				await refreshRegistry(ctx.cwd);
+			} catch (error) {
+				console.error("skills-menu: failed to refresh skills registry", error);
+				ctx.ui.notify("Failed to load skills list", "error");
+				return;
+			}
 
-				const selection = await showSkillsSelector(ctx, registry, selectorIndex, selectorQuery);
-				if (!selection) {
-					return;
-				}
-				selectorIndex = selection.selectedIndex;
-				selectorQuery = selection.query;
-
-				if (selection.type === "create") {
-					const createdSkill = await createSkillFromAnswers(ctx, selection.answers, {
-						thinkingLevel: pi.getThinkingLevel(),
-					});
-					if (!createdSkill) {
-						continue;
-					}
-					await refreshRegistry(ctx.cwd);
-					const createdSkillIndex = registry.allSkills.findIndex((skill) => skill.path === createdSkill.path);
-					selectorIndex = createdSkillIndex >= 0 ? createdSkillIndex + 1 : 0;
-					selectorQuery = "";
-					continue;
-				}
-
-				if (selection.type === "toggle") {
+			const selection = await showSkillsManager(ctx, registry, {
+				onCreate: async (answers, signal) => await createSkillFromAnswersWithoutUI(ctx, answers, {
+					thinkingLevel: pi.getThinkingLevel(),
+					signal,
+				}),
+				onDelete: async (skill) => {
 					try {
-						await setSkillEnabled(ctx.cwd, selection.skill, !selection.skill.enabled);
-						await refreshRegistry(ctx.cwd);
-						ctx.ui.notify(
-							selection.skill.enabled
-								? `Disabled ${selection.skill.name}. Run /reload to fully apply the change.`
-								: `Enabled ${selection.skill.name}. Run /reload to fully apply the change.`,
-							"info",
-						);
-					} catch (error) {
-						console.error("skills-menu: failed to toggle skill", error);
-						ctx.ui.notify(error instanceof Error ? error.message : "Failed to update skill visibility", "error");
-					}
-					continue;
-				}
-
-				if (selection.type === "preview") {
-					await showSkillPreview(ctx, selection.skill);
-					continue;
-				}
-
-				if (selection.type === "delete") {
-					const confirmed = await ctx.ui.confirm(
-						"Delete skill",
-						`Delete ${selection.skill.name}? This removes the skill from disk and cannot be undone.`,
-					);
-					if (!confirmed) {
-						continue;
-					}
-					try {
-						await deleteSkill(ctx, selection.skill);
-						selectorIndex = Math.max(0, selectorIndex - 1);
+						return await deleteSkill(ctx, skill);
 					} catch (error) {
 						console.error("skills-menu: failed to delete skill", error);
 						ctx.ui.notify("Failed to delete skill", "error");
+						return false;
 					}
-					continue;
-				}
-
-				insertSkillMarker(ctx, selection.skill);
+				},
+				onToggle: async (skill, enabled) => {
+					try {
+						await setSkillEnabled(ctx.cwd, skill, enabled);
+					} catch (error) {
+						console.error("skills-menu: failed to toggle skill", error);
+						throw error instanceof Error ? error : new Error("Failed to update skill visibility");
+					}
+				},
+				onRefresh: async () => await refreshRegistry(ctx.cwd),
+			});
+			if (!selection) {
 				return;
 			}
+			insertSkillMarker(ctx, selection);
 		},
 	});
 
@@ -207,7 +167,7 @@ export default function skillsMenuExtension(pi: ExtensionAPI) {
 			return { action: "continue" };
 		}
 
-		if (!currentCwd || currentCwd !== ctx.cwd || registry.skills.length === 0) {
+		if (!currentCwd || currentCwd !== ctx.cwd || registry.allSkills.length === 0) {
 			try {
 				await refreshRegistry(ctx.cwd);
 			} catch (error) {
