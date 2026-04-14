@@ -1,14 +1,25 @@
 # @kmiyh/pi-skills-menu
 
-`@kmiyh/pi-skills-menu` is a Pi Agent extension that moves all skills out of Pi's main menu into a separate menu opened with:
+`@kmiyh/pi-skills-menu` is a Pi extension that moves skill browsing and selection into a dedicated `/skills` menu.
+
+Instead of filling Pi's main menu with many `/skill:<name>` entries, it gives you one focused place to search, preview, insert, create, edit, rename, delete, and enable or disable skills.
+
+## Why use it
+
+- keeps the main menu cleaner when many skills are installed
+- puts project, global, and package-provided skills in one searchable list
+- makes skill selection faster in interactive sessions
+- lets you manage your own skills without leaving the TUI
+
+## Installation
 
 ```bash
-/skills
+pi install npm:@kmiyh/pi-skills-menu
 ```
 
-The idea behind the extension is simple: **keep the main menu from getting cluttered** and make it at least a bit easier to navigate when many skills are installed.
+## What changes after installation
 
-When the extension is installed, it automatically writes the following to `settings.json`:
+When the extension is installed, it automatically writes this to `settings.json`:
 
 ```json
 {
@@ -16,135 +27,148 @@ When the extension is installed, it automatically writes the following to `setti
 }
 ```
 
-This disables the default `/skill:<name>` command registration in the main menu and moves skill usage into one dedicated menu.
+That disables the default `/skill:<name>` command registration in the main menu and replaces it with a single `/skills` entry.
 
-## Installation
+When you insert a skill from the menu, the extension adds a marker like this to the editor:
 
-It can be installed with:
-
-```bash
-pi install npm:@kmiyh/pi-skills-menu
+```text
+[skill] my-skill
 ```
 
-## What the `/skills` menu contains
+Before the message is sent, Pi expands that marker into the actual skill content.
 
-The menu shows **all installed available skills**:
+## What the `/skills` menu shows
 
-- global skills
+The menu includes all available installed skills:
+
 - project skills
-- skills coming from other installed libraries/packages
+- global skills
+- skills provided by installed packages/libraries
 
-The list is split into two sections:
+The list is grouped into:
 
-- **Your Skills** — the user's own skills
-- **Library Skills** — skills coming from other installed libraries
+- **Your Skills** — your own project and global skills
+- **Library Skills** — skills coming from installed packages
 
 ![skills-menu.jpg](src/images/skills-menu.jpg)
 
-## What the menu can do
+## What you can do in `/skills`
 
-### Search
+| Action | Shortcut | Notes |
+| --- | --- | --- |
+| Filter skills by name | type | Search works directly in the list |
+| Open preview | `Tab` | Shows full metadata and content |
+| Insert selected skill | `Enter` | Works only for enabled skills |
+| Enable or disable a skill | `Ctrl+X` | Works for your skills and library skills |
+| Create a new skill | `Enter` on **Create new skill** | Opens the creation flow |
+| Delete your own skill | `Backspace` | Available only for project/global skills you own |
 
-The menu includes a search field for filtering skills by name.
+### Preview a skill
 
-### Skill preview
+Press `Tab` on a selected skill to open preview mode.
 
-Press:
+The preview shows:
 
-- `Tab` — open the selected skill in preview mode
+- the skill name and scope
+- its source path or package
+- whether it is enabled or disabled
+- the full frontmatter
+- the full skill content with scrolling support
 
 ![skill-preview.jpg](src/images/skill-preview.jpg)
 
 ### Insert a skill into the editor
 
-Press:
+Press `Enter` on an enabled skill to insert it into the editor.
 
-- `Enter` — select an enabled skill and insert it into the editor
-
-After that, the skill is inserted into the editor so it will be used by Pi when the message is sent.
+This is useful when you want to explicitly attach one or more skills to the message you are writing, without manually copying skill content.
 
 ### Enable or disable a skill
 
-Press:
+Press `Ctrl+X` to toggle the selected skill.
 
-- `Ctrl+X` — toggle the selected skill between enabled and disabled
+Disabled skills stay visible in the list and are marked with `[disabled]`, so you can still find them and re-enable them later.
 
-This also works for skills that come from installed libraries/packages.
+This also works for skills that come from installed packages.
 
-Disabled skills stay visible in the list and are marked with:
+![skill-disable.jpg](src/images/skill-disable.jpg)
 
-- `[disabled]`
+## Creating a new skill
 
-### Create a new skill
+The first row in the menu is **Create new skill**.
 
-The list also contains a dedicated entry for creating a new skill.
+Creation is split into three short steps:
 
-Skill creation is done in three steps:
+1. **Name** — the skill folder/name slug
+2. **Description** — one clear sentence describing what the skill does and when Pi should use it
+3. **Visibility** — whether the skill should be saved globally or only for the current project
 
-1. **skill name**
+### 1. Name
 
 ![skill-create-name.jpg](src/images/skill-create-name.jpg)
 
-2. **skill description**
+### 2. Description
 
 ![skill-create-description.jpg](src/images/skill-create-description.jpg)
 
-3. **skill visibility**
-   - **Global** — save the skill in your user-level Pi skills directory
-   - **Project** — save the skill in the current project's `.pi/skills` directory
+### 3. Visibility
 
-After that, the extension generates a `SKILL.md`.
+![skill-create-visibility.jpg](src/images/skill-create-visibility.jpg)
+
+After that, the extension generates `SKILL.md` for you.
 
 Generation uses:
 
-- the **currently selected model in the TUI**
-- the **currently selected thinking level** in the TUI
+- the model currently selected in the TUI
+- the current thinking level selected in the TUI
 
-So skill generation always follows the exact model configuration already active in the current Pi session.
+So the draft follows the model configuration already active in your Pi session.
 
-![skill-create-generating.jpg](src/images/skill-create-generating.jpg)
+![skill-create-generate.jpg](src/images/skill-create-generate.jpg)
 
-## Skill preview
+## Editing, renaming, and deleting your own skills
 
-The preview opened with `Tab` contains:
+Your own project and global skills can be managed directly from preview mode.
 
-- the full skill text
-- scrolling support for reading the content
+Library skills can be previewed, inserted, and enabled/disabled, but they cannot be edited, renamed, or deleted from this menu.
 
-From preview mode, you can also use quick actions:
+### Edit skill content
 
-- `r` — edit the skill name
+In preview mode, press `e` to edit the skill content and metadata body.
+
+Use `Ctrl+S` to save.
 
 ![skill-edit.jpg](src/images/skill-edit.jpg)
 
-- `e` — edit the skill content itself
+### Rename a skill
+
+In preview mode, press `r` to rename the skill.
+
+This updates both the directory name and the `name` field in frontmatter.
 
 ![skill-rename.jpg](src/images/skill-rename.jpg)
 
+### Delete a skill
+
+In browse mode or preview mode, press `Backspace` to delete your own skill.
+
+A confirmation dialog is shown before removal.
+
+![skill-delete.jpg](src/images/skill-delete.jpg)
+
 ## Where new skills are saved
 
-New skills are saved into Pi's standard skill directories depending on the selected scope.
+New skills are stored in Pi's standard skill directories depending on the selected visibility.
 
-### Project scope
+| Visibility | Path |
+| --- | --- |
+| Project | `.pi/skills/<skill-name>/SKILL.md` |
+| Global | `~/.pi/agent/skills/<skill-name>/SKILL.md` |
 
-If project scope is selected, the skill is saved here:
-
-```text
-.pi/skills/<skill-name>/SKILL.md
-```
-
-Example:
+Example project skill:
 
 ```text
 .pi/skills/react-review/SKILL.md
-```
-
-### Global scope
-
-If global scope is selected, the skill is saved here:
-
-```text
-~/.pi/agent/skills/<skill-name>/SKILL.md
 ```
 
 ## Local development
@@ -167,31 +191,29 @@ Run the extension directly from a local checkout:
 pi -e ./src/index.ts
 ```
 
-## How to help improve the extension
+## Contributing
 
-If you want to help improve the extension, you can:
+Contributions are welcome, especially around:
 
-- report bugs and UX issues
-- suggest improvements to the `/skills` menu
-- improve skill generation quality
-- improve search and list navigation
-- improve editing and preview flows
-- suggest improvements to project structure and Pi package support
-- etc
+- menu UX and navigation
+- skill search and filtering
+- preview and editing flows
+- skill generation quality
+- Pi package compatibility
 
-A typical contribution workflow:
+Typical workflow:
 
 1. fork the repository
-2. create a separate branch
+2. create a branch
 3. make your changes
-4. verify everything with:
+4. verify with:
 
 ```bash
 npm install
 npm run typecheck
 ```
 
-5. test locally
+5. test locally:
 
 ```bash
 pi -e ./src/index.ts
