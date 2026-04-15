@@ -29,6 +29,8 @@ When the extension is installed, it automatically writes this to `settings.json`
 
 That disables the default `/skill:<name>` command registration in the main menu and replaces it with a single `/skills` entry.
 
+The extension also hides Pi's standard startup `[Skills]` block, so installed skills are shown only through the dedicated `/skills` UI instead of the default startup listing.
+
 When you insert a skill from the menu, the extension adds a marker like this to the editor:
 
 ```text

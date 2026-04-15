@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext, InputEventResult } from "@mariozechner/pi-coding-agent";
+import { InteractiveMode, type ExtensionAPI, type ExtensionContext, type InputEventResult } from "@mariozechner/pi-coding-agent";
 import { createSkillFromAnswersWithoutUI } from "./create-skill.js";
 import { deleteSkill } from "./delete-skill.js";
 import { detectExtensionInstallScope } from "./extension-scope.js";
@@ -15,7 +15,58 @@ const EMPTY_REGISTRY: SkillRegistry = {
 	byName: new Map(),
 };
 
+const HIDE_STARTUP_SKILLS_BLOCK_PATCH = Symbol.for("@kmiyh/pi-skills-menu/hide-startup-skills-block");
+
+type InteractiveModePrototype = {
+	showLoadedResources?: (...args: unknown[]) => unknown;
+	[HIDE_STARTUP_SKILLS_BLOCK_PATCH]?: boolean;
+};
+
+function patchInteractiveModeStartupSkillsBlock(): void {
+	const prototype = InteractiveMode.prototype as unknown as InteractiveModePrototype;
+	if (prototype[HIDE_STARTUP_SKILLS_BLOCK_PATCH]) {
+		return;
+	}
+
+	const originalShowLoadedResources = prototype.showLoadedResources;
+	if (typeof originalShowLoadedResources !== "function") {
+		return;
+	}
+
+	prototype.showLoadedResources = function patchedShowLoadedResources(this: unknown, ...args: unknown[]) {
+		const interactiveMode = this as {
+			session?: {
+				resourceLoader?: {
+					getSkills?: () => { skills: unknown[]; diagnostics?: unknown[] };
+				};
+			};
+		};
+		const resourceLoader = interactiveMode.session?.resourceLoader;
+		if (!resourceLoader || typeof resourceLoader.getSkills !== "function") {
+			return originalShowLoadedResources.apply(this, args);
+		}
+		const originalGetSkills = resourceLoader.getSkills;
+
+		resourceLoader.getSkills = () => {
+			const result = originalGetSkills.call(resourceLoader);
+			return {
+				...result,
+				skills: [],
+			};
+		};
+
+		try {
+			return originalShowLoadedResources.apply(this, args);
+		} finally {
+			resourceLoader.getSkills = originalGetSkills;
+		}
+	};
+
+	prototype[HIDE_STARTUP_SKILLS_BLOCK_PATCH] = true;
+}
+
 export default function skillsMenuExtension(pi: ExtensionAPI) {
+	patchInteractiveModeStartupSkillsBlock();
 	let registry: SkillRegistry = EMPTY_REGISTRY;
 	let currentCwd: string | undefined;
 	let installScope: ExtensionInstallScope | undefined;
